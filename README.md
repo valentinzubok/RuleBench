@@ -71,7 +71,7 @@ recorded in either direction.
 | `"true"`, `1` or `"yes"` counted as a verdict | `literal_bool()` accepts only JSON `true`/`false`; anything else reverts and no ruling is recorded. |
 | An administrator overruling, dismissing or deleting a case | There is none: no owner, no admin, no ownership transfer, no `overrule`, no `reopen`. The rule's author has no power over reports under it. Only the reporter can withdraw, and only before the first ruling. |
 | The content, the claim or the grounds steering the model | All four inputs are fenced as untrusted data, inner fences are neutralized, and injection phrasing is flagged to the model and stored on the report. |
-| Only the top of a long thread being read | The whole document is hashed; the excerpt is ≤2400 chars from the head plus non-overlapping windows around the rule's and the claim's own words. |
+| Part of the content never being read | The whole document is hashed. A document of up to 2400 chars is frozen whole. A longer one keeps the head, windows around every occurrence of the rule's and the claim's own words, and then the first stretches no window has covered, up to 2400 chars. |
 | Consensus quietly degrading | No fallback: if `prompt_comparative` cannot run, the transaction reverts. `principle` is passed positionally (it is positional-only in GenVM v0.3). |
 
 ## Live
@@ -80,7 +80,7 @@ recorded in either direction.
 |---|---|
 | Console | **https://valentinzubok.github.io/RuleBench/** (reads work with no wallet) |
 | Network | GenLayer Studio Dev / Studio Next — chain `61997` |
-| Contract | [`0xBf9Fd0991CEe7f2133E14351fd41cAbFBeD05BA9`](https://explorer-studio-dev.genlayer.com/address/0xBf9Fd0991CEe7f2133E14351fd41cAbFBeD05BA9) |
+| Contract | [`0xE61681930Fb59B22E2764d95fbd041282cb1CD0d`](https://explorer-studio-dev.genlayer.com/address/0xE61681930Fb59B22E2764d95fbd041282cb1CD0d) |
 | Contract-only repo | [RuleBenchCore](https://github.com/valentinzubok/RuleBenchCore) |
 | Deploy record | [`STUDIO_DEV_DEPLOY.md`](STUDIO_DEV_DEPLOY.md) — every transaction of the demo, including the refused ones |
 
@@ -116,7 +116,7 @@ npm run dev      # http://localhost:3017
 
 ```bash
 pip install -r requirements-dev.txt
-python3 -m pytest -q      # 54 tests
+python3 -m pytest -q      # 57 tests
 ```
 
 `tests/test_adversarial.py` is the half that matters:
@@ -126,7 +126,9 @@ python3 -m pytest -q      # 54 tests
   consensus failure in either round.
 - **The evidence is what was frozen.** The post is deleted, then rewritten: both rulings still
   judge the frozen text. Unreadable content cannot be reported. The rule text is copied into the
-  report and cannot change under it. A violation 7 KB into a long thread is still in the excerpt.
+  report and cannot change under it. A document that fits the budget is frozen whole, a keyword
+  inside a kept window does not hide a later occurrence, and a violation 7 KB into a long thread is
+  still in the excerpt.
 - **The process cannot be hurried.** Four accounts cannot rule before the review delay; the
   reporter cannot pass a shorter delay; the delay is elapsed time, not a clock boundary; a ruling
   cannot be finalized while it can be appealed; an appeal is not ruled on until the window closes,

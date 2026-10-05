@@ -147,27 +147,63 @@ def _keywords(*texts) -> list:
 
 
 def build_digest(normalized: str, anchor_text: str) -> dict:
-    """Bounded deterministic view of the WHOLE document, anchored on the rule's and the claim's words."""
+    """Bounded deterministic view of the WHOLE document.
+
+    A document that fits the budget is kept whole, so nothing in a short post can fall
+    between windows. A longer one gets the head, then windows around the rule's and the
+    claim's own words, then - if windows and budget remain - the first uncovered stretches,
+    so a keyword that landed inside an existing window never leaves a gap unread.
+    """
     doc = normalized
     total = len(doc)
+    if total <= EVIDENCE_BUDGET_CHARS:
+        excerpts = [{"from_char": 0, "match": "whole_document", "text": doc}] if doc else []
+        return {
+            "excerpts": excerpts,
+            "excerpt_chars": total,
+            "total_chars": total,
+            "covers_whole_document": True,
+        }
+
     windows = []
 
-    def add(start: int, label: str) -> None:
+    def add(start: int, label: str) -> bool:
         start = max(0, min(start, max(0, total - 1)))
         end = min(total, start + WINDOW_CHARS)
         for w in windows:
             if not (end <= w["start"] or start >= w["end"]):
-                return
+                return False
         windows.append({"start": start, "end": end, "label": label})
+        return True
 
     add(0, "head")
     lowered = doc.lower()
     for word in _keywords(anchor_text):
         if len(windows) >= MAX_WINDOWS:
             break
+        # Try every occurrence, not only the first: an early mention inside a window that
+        # is already kept must not hide a later one elsewhere in the document.
         idx = lowered.find(word)
-        if idx >= 0:
-            add(max(0, idx - WINDOW_CHARS // 4), word)
+        while idx >= 0:
+            if add(max(0, idx - WINDOW_CHARS // 4), word):
+                break
+            idx = lowered.find(word, idx + 1)
+
+    # Spend what is left on text nobody has looked at yet, from the top down.
+    cursor = 0
+    while len(windows) < MAX_WINDOWS and cursor < total:
+        covering = [w for w in windows if w["start"] <= cursor < w["end"]]
+        if covering:
+            cursor = max(w["end"] for w in covering)
+            continue
+        following = [w["start"] for w in windows if w["start"] > cursor]
+        gap_end = min(following) if following else total
+        if gap_end - cursor >= WINDOW_CHARS or not following:
+            add(cursor, "uncovered")
+            cursor += WINDOW_CHARS
+        else:
+            windows.append({"start": cursor, "end": gap_end, "label": "uncovered"})
+            cursor = gap_end
 
     windows.sort(key=lambda w: w["start"])
     excerpts = []

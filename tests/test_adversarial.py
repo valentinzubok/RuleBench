@@ -234,6 +234,33 @@ def test_a_violation_buried_deep_in_a_long_thread_is_still_shown():
     assert r["covers_whole_document"] is False
 
 
+def test_a_document_that_fits_the_budget_is_frozen_whole():
+    """Nothing in a short post can fall between two windows."""
+    doc = "Warning thread. " + "x" * 500 + " quoted advert: code HARBOR20 " + "y" * 700 + " end."
+    assert len(doc) < mod.EVIDENCE_BUDGET_CHARS
+    d = mod.build_digest(doc, RULE + " " + CLAIM)
+    assert d["covers_whole_document"] is True and d["excerpt_chars"] == len(doc)
+    assert len(d["excerpts"]) == 1 and d["excerpts"][0]["text"] == doc
+    exact = "z" * mod.EVIDENCE_BUDGET_CHARS
+    assert mod.build_digest(exact, RULE)["covers_whole_document"] is True
+    assert mod.build_digest("", RULE)["excerpts"] == []
+
+
+def test_a_keyword_inside_a_kept_window_does_not_hide_a_later_occurrence():
+    filler = "Ordinary discussion about tides, moorings and the weekend regatta. " * 60
+    doc = "advertising is discussed here in passing. " + filler + "Real advertising: code HARBOR20."
+    d = mod.build_digest(doc, "advertising")
+    assert any("HARBOR20" in e["text"] for e in d["excerpts"])
+
+
+def test_spare_windows_are_spent_on_text_nobody_has_looked_at():
+    doc = "".join(f"[{i:04d}]" + "q" * 394 for i in range(8))  # 3200 chars, no keyword at all
+    d = mod.build_digest(doc, RULE)
+    assert len(d["excerpts"]) == mod.MAX_WINDOWS
+    assert d["excerpt_chars"] == mod.EVIDENCE_BUDGET_CHARS
+    assert [e["from_char"] for e in d["excerpts"]] == [i * 400 for i in range(6)]
+
+
 def test_the_digest_is_bounded_deterministic_and_non_overlapping():
     doc = " ".join(f"token{i} advertising paid services discount codes" for i in range(900))
     a = mod.build_digest(doc, RULE + " " + CLAIM)

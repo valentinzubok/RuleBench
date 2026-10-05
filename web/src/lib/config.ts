@@ -1,6 +1,6 @@
 /** Live RuleBench deploy on GenLayer Studio Dev (chain 61997). Override via env. */
 export const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_RULEBENCH_ADDRESS ||
-  "0xBf9Fd0991CEe7f2133E14351fd41cAbFBeD05BA9") as `0x${string}`;
+  "0xE61681930Fb59B22E2764d95fbd041282cb1CD0d") as `0x${string}`;
 
 /** Studio Dev / Studio Next — chain ID 61997. */
 export const CHAIN_ID = 61997;
